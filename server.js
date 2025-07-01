@@ -58,7 +58,11 @@ async function main() {
 }
 
 app.use('/api/intern',internRoutes);
-app.use('/api/hr',HrRoutes)
+app.use('/api/hr',HrRoutes);
+
+app.use('/api/ping',(req,res)=>{
+  res.status(200).send('okk')
+})
 
 
 
