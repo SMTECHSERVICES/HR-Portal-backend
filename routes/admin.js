@@ -92,43 +92,62 @@ router.post('/intern/register',async(req,res)=>{
     }
 });
 
-router.post('/markAttendance', async (req, res) => {
+router.get("/allEmployees",async(req,res)=>{
   try {
-    const { name, email, date, status } = req.body;
-    console.log(req.body);
+    const allInterns = await Intern.find().select("-password -attendance -assignment");
+    return res.status(200).json({
+      allInterns
+    })
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      message:'Internal server error'
+    })
+  }
+})
+
+router.post('/markAttendance/:id', async (req, res) => {
+  const id = req.params.id;
+
+  try {
+    const { status } = req.body;
 
     // 1. Validate
-    if (!email || !date || !status) {
-      return res.status(400).json({ message: 'Email, date and status are required' });
+    if (!status) {
+      return res.status(400).json({ message: 'Status is required' });
     }
 
-    // 2. Find intern by email
-    const intern = await Intern.findOne({ email });
+    // 2. Find intern
+    const intern = await Intern.findById(id);
     if (!intern) {
       return res.status(404).json({ message: 'Intern does not exist' });
     }
 
-    // 3. Check if attendance already marked for the given date
-    const formattedInputDate = new Date(date).toISOString().split('T')[0];
-    const alreadyMarked = intern.attendance.some(entry => {
-      const entryDate = new Date(entry.date).toISOString().split('T')[0];
-      return entryDate === formattedInputDate;
+    // 3. Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split('T')[0];
+
+    // 4. Check if attendance for today already exists
+    const existingEntry = intern.attendance.find(entry => {
+      const entryDate = new Date(entry.date || new Date()).toISOString().split('T')[0];
+      return entryDate === today;
     });
 
-    if (alreadyMarked) {
-      return res.status(400).json({ message: 'Attendance already marked for today' });
+    if (existingEntry) {
+      // 5. If exists, update the status
+      existingEntry.status = status;
+    } else {
+      // 6. If not exists, push a new entry
+      intern.attendance.push({
+        date: new Date(),
+        status
+      });
     }
 
-    // 4. Push new attendance entry
-    intern.attendance.push({
-      date: new Date(date),
-      status
-    });
-
+    // 7. Save the intern
     await intern.save();
 
     res.status(200).json({
-      message: 'Attendance marked successfully',
+      message: existingEntry ? 'Attendance updated for today' : 'Attendance marked successfully',
       attendance: intern.attendance
     });
   } catch (error) {
@@ -136,6 +155,7 @@ router.post('/markAttendance', async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
 
 router.post('/assignTask', async (req, res) => {
   try {
@@ -217,6 +237,24 @@ router.get('/allInfo', async (req, res) => {
     });
   }
 });
+
+router.get("/getEmployeeDetail/:id",async(req,res)=>{
+  const id = req.params.id;
+  try {
+    const user = await Intern.findById(id).select("-password");
+    if(!user){
+      return res.status(404).json({
+        message:'user does not exist'
+      })
+    }
+
+    return res.status(200).json({
+      user
+    })
+  } catch (error) {
+    
+  }
+})
 
 
 router.post('/logout', async (req, res) => {

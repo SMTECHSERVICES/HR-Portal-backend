@@ -34,7 +34,7 @@ const internSchema = new mongoose.Schema({
       },
       status: {
         type: String,
-        enum: ['Present', 'Absent', 'Leave'],
+        enum: ['Present', 'Absent', 'Leave','Half Day'],
         default: 'Present'
       }
     }
