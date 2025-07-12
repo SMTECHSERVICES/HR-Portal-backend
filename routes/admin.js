@@ -6,6 +6,8 @@ import dotenv from 'dotenv'
 import HR from "../model/hr.js";
 import ExcelJS from 'exceljs';
 import { hrProtectMiddleware } from "../middleware/hr.js";
+import upload from "../middleware/multer.js";
+import cloudinary from "../utils/cloudinary.js";
 
 dotenv.config();
 
@@ -158,32 +160,83 @@ router.post('/markAttendance/:id', async (req, res) => {
 });
 
 
-router.post('/assignTask', async (req, res) => {
+// router.post('/assignTask', async (req, res) => {
+//   try {
+//     const { email, internName, taskTitle, description, deadline } = req.body;
+
+//     if (!email || !taskTitle || !description || !deadline) {
+//       return res.status(400).json({ message: 'All fields are required' });
+//     }
+
+//     // 1. Find intern by email
+//     const intern = await Intern.findOne({ email }); // fixed typo: findone -> findOne
+//     if (!intern) {
+//       return res.status(404).json({ message: 'User does not exist' });
+//     }
+
+//     // 2. Add new task to assignments
+//     intern.assignment.push({
+//       title: taskTitle,
+//       description,
+//       deadline: new Date(deadline),
+//     });
+
+//     await intern.save();
+
+//     res.status(200).json({
+//       message: `Task assigned to ${intern.fullName}`,
+//       assignments: intern.assignment
+//     });
+//   } catch (error) {
+//     console.error('Assign Task Error:', error);
+//     res.status(500).json({ message: 'Internal server error' });
+//   }
+// });
+
+router.post('/assignTask', upload.single('pptFile'), async (req, res) => {
   try {
-    const { email, internName, taskTitle, description, deadline } = req.body;
+    const { email, taskTitle, description, deadline } = req.body;
 
     if (!email || !taskTitle || !description || !deadline) {
       return res.status(400).json({ message: 'All fields are required' });
     }
 
-    // 1. Find intern by email
-    const intern = await Intern.findOne({ email }); // fixed typo: findone -> findOne
+    // Find intern by email
+    const intern = await Intern.findOne({ email });
     if (!intern) {
       return res.status(404).json({ message: 'User does not exist' });
     }
 
-    // 2. Add new task to assignments
+    // Handle optional file upload
+    let pptUrl = null;
+    if (req.file && req.file.buffer) {
+      try {
+        const base64File = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+        const result = await cloudinary.uploader.upload(base64File, {
+          folder: 'assignments',
+          resource_type: 'raw',
+          public_id: `${Date.now()}-${req.file.originalname}`,
+        });
+        pptUrl = result.secure_url;
+      } catch (uploadErr) {
+        console.error('Cloudinary Upload Failed:', uploadErr);
+        return res.status(500).json({ message: 'File upload failed' });
+      }
+    }
+
+    // Add task to assignment list
     intern.assignment.push({
       title: taskTitle,
       description,
       deadline: new Date(deadline),
+      pptFile: pptUrl || null,  // set to null if no file uploaded
     });
 
     await intern.save();
 
     res.status(200).json({
       message: `Task assigned to ${intern.fullName}`,
-      assignments: intern.assignment
+      assignments: intern.assignment,
     });
   } catch (error) {
     console.error('Assign Task Error:', error);

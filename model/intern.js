@@ -49,6 +49,7 @@ const internSchema = new mongoose.Schema({
         type: String,
         required: true
       },
+      pptFile: String,
       deadline: {
         type: Date,
         required: true
