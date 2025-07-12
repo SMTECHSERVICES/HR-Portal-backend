@@ -2,7 +2,8 @@ import express from "express"
 import jwt from 'jsonwebtoken'
 import Intern from "../model/intern.js";
 import bcrypt from 'bcryptjs';
-import dotenv from 'dotenv'
+import dotenv from 'dotenv';
+
 import { internProtectRoute } from "../middleware/intern.js";
 
 dotenv.config();
@@ -123,6 +124,9 @@ router.get('/my-tasks',async(req,res)=>{
         
     }
 })
+
+// GET /hr/export-interns
+
 
 
 router.post('/logout', async (req, res) => {

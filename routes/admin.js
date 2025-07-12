@@ -4,6 +4,7 @@ import Intern from "../model/intern.js";
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv'
 import HR from "../model/hr.js";
+import ExcelJS from 'exceljs';
 import { hrProtectMiddleware } from "../middleware/hr.js";
 
 dotenv.config();
@@ -256,6 +257,79 @@ router.get("/getEmployeeDetail/:id",async(req,res)=>{
   }
 })
 
+router.get('/export-interns', async (req, res) => {
+  try {
+    const interns = await Intern.find();
+
+    const workbook = new ExcelJS.Workbook();
+
+    // Sheet 1: Intern Details
+    const detailsSheet = workbook.addWorksheet('Intern Details');
+    detailsSheet.columns = [
+      { header: 'Full Name', key: 'fullName', width: 25 },
+      { header: 'Email', key: 'email', width: 30 },
+      { header: 'Phone', key: 'phoneNumber', width: 15 },
+      { header: 'University', key: 'university', width: 25 },
+      { header: 'Joined At', key: 'createdAt', width: 20 },
+    ];
+
+    interns.forEach(intern => {
+      detailsSheet.addRow({
+        fullName: intern.fullName,
+        email: intern.email,
+        phoneNumber: intern.phoneNumber,
+        university: intern.university,
+        createdAt: intern.createdAt.toLocaleDateString('en-IN'),
+      });
+    });
+
+    // Sheet 2: Attendance Summary
+    const attendanceSheet = workbook.addWorksheet('Attendance Summary');
+    attendanceSheet.columns = [
+      { header: 'Full Name', key: 'name', width: 25 },
+      { header: 'Month', key: 'month', width: 15 },
+      { header: 'Present', key: 'present', width: 10 },
+      { header: 'Absent', key: 'absent', width: 10 },
+      { header: 'Leave', key: 'leave', width: 10 },
+      { header: 'Half Day', key: 'halfday', width: 10 },
+      { header: 'Week Off', key: 'weekoff', width: 10 },
+    ];
+
+    interns.forEach(intern => {
+      const monthlyStats = {};
+
+      intern.attendance.forEach(({ date, status }) => {
+        const month = new Date(date).toLocaleString('en-IN', { month: 'short', year: 'numeric' });
+        if (!monthlyStats[month]) {
+          monthlyStats[month] = { Present: 0, Absent: 0, Leave: 0, 'Half Day': 0, 'Week off': 0 };
+        }
+        monthlyStats[month][status] = (monthlyStats[month][status] || 0) + 1;
+      });
+
+      for (const month in monthlyStats) {
+        attendanceSheet.addRow({
+          name: intern.fullName,
+          month,
+          present: monthlyStats[month]['Present'] || 0,
+          absent: monthlyStats[month]['Absent'] || 0,
+          leave: monthlyStats[month]['Leave'] || 0,
+          halfday: monthlyStats[month]['Half Day'] || 0,
+          weekoff: monthlyStats[month]['Week off'] || 0,
+        });
+      }
+    });
+
+    // Set headers for download
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=Interns_Attendance_Report.xlsx');
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error('Error generating Excel:', err);
+    res.status(500).json({ message: 'Failed to generate Excel file' });
+  }
+});
 
 router.post('/logout', async (req, res) => {
   try {
