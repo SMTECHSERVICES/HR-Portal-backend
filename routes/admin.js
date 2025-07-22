@@ -108,12 +108,11 @@ router.get("/allEmployees",async(req,res)=>{
     })
   }
 })
-
 router.post('/markAttendance/:id', async (req, res) => {
   const id = req.params.id;
 
   try {
-    const { status } = req.body;
+    const { status, date } = req.body;
 
     // 1. Validate
     if (!status) {
@@ -126,31 +125,31 @@ router.post('/markAttendance/:id', async (req, res) => {
       return res.status(404).json({ message: 'Intern does not exist' });
     }
 
-    // 3. Get today's date in YYYY-MM-DD format
-    const today = new Date().toISOString().split('T')[0];
+    // 3. Determine date to use (either provided or today's date)
+    const targetDate = date || new Date().toISOString().split('T')[0];
 
-    // 4. Check if attendance for today already exists
+    // 4. Check if attendance for that date already exists
     const existingEntry = intern.attendance.find(entry => {
-      const entryDate = new Date(entry.date || new Date()).toISOString().split('T')[0];
-      return entryDate === today;
+      const entryDate = new Date(entry.date).toISOString().split('T')[0];
+      return entryDate === targetDate;
     });
 
     if (existingEntry) {
-      // 5. If exists, update the status
+      // 5. Update status if exists
       existingEntry.status = status;
     } else {
-      // 6. If not exists, push a new entry
+      // 6. Add new attendance entry
       intern.attendance.push({
-        date: new Date(),
+        date: targetDate,
         status
       });
     }
 
-    // 7. Save the intern
+    // 7. Save intern record
     await intern.save();
 
-    res.status(200).json({
-      message: existingEntry ? 'Attendance updated for today' : 'Attendance marked successfully',
+    return res.status(200).json({
+      message: existingEntry ? 'Attendance updated' : 'Attendance marked successfully',
       attendance: intern.attendance
     });
   } catch (error) {
@@ -295,18 +294,23 @@ router.get('/allInfo', async (req, res) => {
 router.get("/getEmployeeDetail/:id",async(req,res)=>{
   const id = req.params.id;
   try {
-    const user = await Intern.findById(id).select("-password");
+    const user = await Intern.findById(id).select("-password").lean();
     if(!user){
       return res.status(404).json({
         message:'user does not exist'
       })
     }
 
+      if (Array.isArray(user.attendance)) {
+      user.attendance.sort((a, b) => new Date(b.date) - new Date(a.date));
+    }
+
     return res.status(200).json({
       user
     })
   } catch (error) {
-    
+    console.log(error);
+    return res.status(500).json('Internal server error')
   }
 })
 
